@@ -22,7 +22,7 @@ RUN wget -qq http://mirror.nexcess.net/apache/tomcat/tomcat-7/v${TOMCAT_VERSION}
 	tar -xzvf apache-tomcat-${TOMCAT_VERSION}.tar.gz ; \
 	rm -r apache-tomcat-${TOMCAT_VERSION}/webapps/* ; \
 	rm apache-tomcat-${TOMCAT_VERSION}.tar.gz ; \
-	ln -s apache-tomcat-${TOMCAT_VERSION} /opt/apache-tomcat 
+	ln -s apache-tomcat-${TOMCAT_VERSION} /opt/apache-tomcat
 
 # install elastic search
 #
@@ -38,17 +38,19 @@ ENV INVISO_COMMIT_HASH a29450ace4a9f467d34f29b6f69094b69edbff1b
 # clone the inviso repo and build the project
 #
 RUN git clone https://github.com/Netflix/inviso.git ; \
-	(cd inviso; git reset --hard ${INVISO_COMMIT_HASH} ; ./gradlew assemble) 
+	(cd inviso; git reset --hard ${INVISO_COMMIT_HASH} ; ./gradlew assemble)
 RUN cp "${TARGET}/inviso/trace-mr2/build/libs/inviso#mr2#v0.war" ${TARGET}/apache-tomcat-${TOMCAT_VERSION}/webapps/ ; \
 	ln -s ${TARGET}/inviso/web-ui/public ${TARGET}/apache-tomcat-${TOMCAT_VERSION}/webapps/ROOT
+
+ENV ELASTICSEARCH_URL "${EXTERNAL_ELASTICSEARCH_URL:-localhost:9200}"
 
 # configure elasticsearch to point to inviso
 #
 # NOTE: for some reason the -p flag inside a docker build doesn't write out the pidfile :\
 #
 RUN ${TARGET}/elasticsearch-${ELASTICSEARCH_VERSION}/bin/elasticsearch -d ; \
-	curl -XPUT http://localhost:9200/inviso -d @${TARGET}/inviso/elasticsearch/mappings/config-settings.json ; \
-	curl -XPUT http://localhost:9200/inviso-cluster -d @${TARGET}/inviso/elasticsearch/mappings/cluster-settings.json ; \
+	curl -XPUT http://${EXTERNAL_ELASTICSEARCH_URL}/inviso -d @${TARGET}/inviso/elasticsearch/mappings/config-settings.json ; \
+	curl -XPUT http://${EXTERNAL_ELASTICSEARCH_URL}/inviso-cluster -d @${TARGET}/inviso/elasticsearch/mappings/cluster-settings.json ; \
 	kill -9 `ps auxww | grep java | grep -v grep | awk '{print $2}'`
 
 ENV SERVICE_CONF /etc/supervisor/conf.d/services.conf
